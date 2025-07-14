@@ -27,7 +27,7 @@ jobs:
     with:
       toolchain: 'ClangCL'
       os_name: 'Windows'
-      runner_labels: '["windows-2025"]'
+      runner_labels: '["windows-latest"]'
       arch: 'x86_64'
       build_preset: 'Windows_Sanitizer_CI'
       clang_plugins: false
