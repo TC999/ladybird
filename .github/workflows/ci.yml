@@ -19,7 +19,7 @@ jobs:
         build_preset: ['Sanitizer']
         toolchain: ['GNU']
         clang_plugins: [false]
-        runner_labels: ['["blacksmith-16vcpu-ubuntu-2404"]']
+        runner_labels: ['["ubuntu-24.04"]']
 
         include:
           - os_name: 'Linux'
@@ -27,7 +27,7 @@ jobs:
             build_preset: 'Sanitizer'
             toolchain: 'Clang'
             clang_plugins: true
-            runner_labels: '["blacksmith-16vcpu-ubuntu-2404"]'
+            runner_labels: '["ubuntu-24.04"]'
 
           - os_name: 'macOS'
             arch: 'arm64'
@@ -41,7 +41,7 @@ jobs:
             build_preset: 'Fuzzers'
             toolchain: 'Clang'
             clang_plugins: false
-            runner_labels: '["blacksmith-16vcpu-ubuntu-2404"]'
+            runner_labels: '["ubuntu-24.04"]'
 
     uses: ./.github/workflows/lagom-template.yml
     with:
