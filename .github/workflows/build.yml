@@ -1,0 +1,51 @@
+name: Build Ladybird
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装依赖包（APT）
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf autoconf-archive automake build-essential ccache cmake curl fonts-liberation2 git libgl1-mesa-dev nasm ninja-build pkg-config python3-venv qt6-base-dev qt6-tools-dev-tools libpulse-dev
+
+      - name: 安装 LLVM clang-20
+        run: |
+          sudo wget -O /usr/share/keyrings/llvm-snapshot.gpg.key https://apt.llvm.org/llvm-snapshot.gpg.key
+          echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg.key] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt update
+          sudo apt install -y clang-20 lld-20
+
+      - name: 设置 clang-20 为默认编译器
+        run: |
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-20 100
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-20 100
+
+      - name: 配置 Python 虚拟环境
+        run: |
+          python3 -m venv ladybird-venv
+          source ladybird-venv/bin/activate
+          pip install --upgrade pip
+
+      - name: 构建 Ladybird 可执行文件
+        run: |
+          source ladybird-venv/bin/activate
+          ./Meta/ladybird.py run
+
+      - name: 上传可执行文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: ladybird-executable
+          path: |
+            Build/release/bin/Ladybird*
