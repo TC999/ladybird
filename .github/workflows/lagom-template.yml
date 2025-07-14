@@ -52,6 +52,9 @@ jobs:
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
 
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'push' }}
+
       - name: Set Up Environment
         uses: ./.github/actions/setup
         with:

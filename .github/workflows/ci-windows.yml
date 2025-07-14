@@ -1,4 +1,4 @@
-name: CI
+name: CI-Windows
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - reopened
       - labeled
       - unlabeled
+  push:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
