@@ -222,6 +222,13 @@ jobs:
           retention-days: 0
           if-no-files-found: ignore
 
+      - name: Upload LibWeb Test Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libweb-test-artifacts-${{ inputs.os_name }}-${{ inputs.build_preset }}-${{ inputs.toolchain }}-${{ inputs.clang-plugins }}
+          path: ${{ github.workspace }}/Build
+          if-no-files-found: ignore
+
       - name: Sanitizer Output
         if: ${{ !cancelled() && inputs.build_preset == 'Sanitizer' }}
         working-directory: ${{ github.workspace }}
