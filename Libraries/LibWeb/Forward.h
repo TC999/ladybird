@@ -35,7 +35,7 @@ AK_TYPEDEF_DISTINCT_NUMERIC_GENERAL(i64, UniqueNodeID, Comparison, Increment, Ca
 namespace Web::Painting {
 
 class BackingStore;
-
+class DevicePixelConverter;
 class DisplayList;
 class DisplayListPlayerSkia;
 class DisplayListRecorder;
@@ -192,6 +192,7 @@ class BasicShapeStyleValue;
 class BorderImageSliceStyleValue;
 class BorderRadiusStyleValue;
 class CalculatedStyleValue;
+class CascadedProperties;
 class Clip;
 class ColorMixStyleValue;
 class ColorSchemeStyleValue;

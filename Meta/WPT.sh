@@ -619,15 +619,15 @@ import_wpt()
 
     pushd "${LADYBIRD_SOURCE_DIR}" > /dev/null
         ./Meta/ladybird.py build test-web
-        set +e
+        trap 'exit 1' EXIT INT TERM
         for path in "${TESTS[@]}"; do
             echo "Importing test from ${path}"
             if ! ./Meta/import-wpt-test.py "${IMPORT_ARGS[@]}" https://wpt.live/"${path}"; then
                 continue
             fi
-            "${TEST_WEB_BINARY}" --rebaseline -f "$path"
+            "${TEST_WEB_BINARY}" --rebaseline -f "$path" || true
         done
-        set -e
+        trap - EXIT INT TERM
     popd > /dev/null
 }
 
@@ -659,10 +659,19 @@ if [[ "$CMD" =~ ^(update|clean|run|serve|compare|import|list-tests)$ ]]; then
             serve_wpt
             ;;
         import)
-            if [ "$1" = "--force" ]; then
+            while [[ "$1" =~ ^--(force|wpt-base-url)$ ]]; do
+                if [ "$1" = "--wpt-base-url" ]; then
+                    if [ -z "$2" ]; then
+                        echo "Missing argument for --wpt-base-url"
+                        usage
+                    fi
+                    IMPORT_ARGS+=( "--wpt-base-url=$2" )
+                    shift
+                else
+                    IMPORT_ARGS+=( "$1" )
+                fi
                 shift
-                IMPORT_ARGS+=( "--force" )
-            fi
+            done
             if [ $# -eq 0 ]; then
                 usage
             fi

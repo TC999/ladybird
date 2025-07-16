@@ -432,13 +432,14 @@ void BlockFormattingContext::compute_width_for_block_level_replaced_element_in_n
         margin_right = zero_value;
 
     auto& box_state = m_state.get_mutable(box);
-    box_state.set_content_width(compute_width_for_replaced_element(box, available_space));
+    auto width = compute_width_for_replaced_element(box, available_space);
     box_state.margin_left = margin_left.to_px(box);
     box_state.margin_right = margin_right.to_px(box);
     box_state.border_left = computed_values.border_left().width;
     box_state.border_right = computed_values.border_right().width;
     box_state.padding_left = padding_left;
     box_state.padding_right = padding_right;
+    box_state.set_content_width(calculate_inner_width(box, available_space.width, CSS::Size::make_px(width)));
 }
 
 void BlockFormattingContext::resolve_used_height_if_not_treated_as_auto(Box const& box, AvailableSpace const& available_space)
@@ -1198,18 +1199,17 @@ void BlockFormattingContext::ensure_sizes_correct_for_left_offset_calculation(Li
         image_height = list_style_image->natural_height().value_or(0);
     }
 
-    auto default_marker_width = max(4, marker.first_available_font().pixel_size_rounded_up() - 4);
-
-    auto marker_text = marker.text().value_or({});
-    if (marker_text.is_empty()) {
+    auto marker_text = marker.text();
+    if (!marker_text.has_value()) {
+        auto default_marker_width = max(4, marker.first_available_font().pixel_size() - 4);
         marker_state.set_content_width(image_width + default_marker_width);
     } else {
         // FIXME: Use per-code-point fonts to measure text.
-        auto text_width = marker.first_available_font().width(marker_text.code_points());
+        auto text_width = marker.first_available_font().width(marker_text.value().code_points());
         marker_state.set_content_width(image_width + CSSPixels::nearest_value_for(text_width));
     }
 
-    marker_state.set_content_height(max(image_height, marker.first_available_font().pixel_size_rounded_up() + 1));
+    marker_state.set_content_height(max(image_height, CSSPixels { marker.first_available_font().pixel_size() }));
 }
 
 void BlockFormattingContext::layout_list_item_marker(ListItemBox const& list_item_box, CSSPixels const& left_space_before_list_item_elements_formatted)
@@ -1221,7 +1221,8 @@ void BlockFormattingContext::layout_list_item_marker(ListItemBox const& list_ite
     auto& marker_state = m_state.get_mutable(marker);
     auto& list_item_state = m_state.get_mutable(list_item_box);
 
-    auto default_marker_width = max(4, marker.first_available_font().pixel_size_rounded_up() - 4);
+    auto marker_text = marker.text();
+    auto default_marker_width = marker_text.has_value() ? 0 : max(4, marker.first_available_font().pixel_size() - 4);
     auto final_marker_width = marker_state.content_width() + default_marker_width;
 
     if (marker.list_style_position() == CSS::ListStylePosition::Inside) {
@@ -1231,7 +1232,7 @@ void BlockFormattingContext::layout_list_item_marker(ListItemBox const& list_ite
 
     auto offset_y = max(CSSPixels(0), (marker.computed_values().line_height() - marker_state.content_height()) / 2);
 
-    marker_state.set_content_offset({ left_space_before_list_item_elements_formatted - final_marker_width, offset_y });
+    marker_state.set_content_offset({ left_space_before_list_item_elements_formatted - final_marker_width, round(offset_y) });
 
     if (marker_state.content_height() > list_item_state.content_height())
         list_item_state.set_content_height(marker_state.content_height());

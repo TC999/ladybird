@@ -62,6 +62,7 @@ static bool can_selector_use_fast_matches(Selector const& selector)
                         PseudoClass::OnlyChild,
                         PseudoClass::Root,
                         PseudoClass::State,
+                        PseudoClass::Unchecked,
                         PseudoClass::Visited))
                     return false;
             } else if (!first_is_one_of(simple_selector.type,
@@ -294,6 +295,11 @@ String Selector::PseudoElementSelector::serialize() const
     }
 
     m_value.visit(
+        [&builder](NonnullRefPtr<Selector> const& compund_selector) {
+            builder.append('(');
+            builder.append(compund_selector->serialize());
+            builder.append(')');
+        },
         [&builder](PTNameSelector const& pt_name_selector) {
             builder.append('(');
             if (pt_name_selector.is_universal)

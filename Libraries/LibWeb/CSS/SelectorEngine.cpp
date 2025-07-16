@@ -616,6 +616,8 @@ static inline bool matches_pseudo_class(CSS::Selector::SimpleSelector::PseudoCla
         return element.matches_enabled_pseudo_class();
     case CSS::PseudoClass::Checked:
         return element.matches_checked_pseudo_class();
+    case CSS::PseudoClass::Unchecked:
+        return element.matches_unchecked_pseudo_class();
     case CSS::PseudoClass::Indeterminate:
         return matches_indeterminate_pseudo_class(element);
     case CSS::PseudoClass::HighValue:
@@ -803,12 +805,6 @@ static inline bool matches_pseudo_class(CSS::Selector::SimpleSelector::PseudoCla
     }
     case CSS::PseudoClass::Target:
         return element.is_target();
-    case CSS::PseudoClass::TargetWithin: {
-        auto* target_element = element.document().target_element();
-        if (!target_element)
-            return false;
-        return element.is_inclusive_ancestor_of(*target_element);
-    }
     case CSS::PseudoClass::Dir: {
         // "Values other than ltr and rtl are not invalid, but do not match anything."
         // - https://www.w3.org/TR/selectors-4/#the-dir-pseudo

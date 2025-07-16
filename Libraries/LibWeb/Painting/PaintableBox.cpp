@@ -327,7 +327,7 @@ void PaintableBox::before_paint(PaintContext& context, PaintPhase phase) const
         return;
 
     if (first_is_one_of(phase, PaintPhase::Background, PaintPhase::Foreground) && own_clip_frame()) {
-        apply_clip(context, own_clip_frame());
+        context.display_list_recorder().push_clip_frame(own_clip_frame());
     } else if (!has_css_transform()) {
         apply_clip_overflow_rect(context, phase);
     }
@@ -341,7 +341,7 @@ void PaintableBox::after_paint(PaintContext& context, PaintPhase phase) const
 
     reset_scroll_offset(context);
     if (first_is_one_of(phase, PaintPhase::Background, PaintPhase::Foreground) && own_clip_frame()) {
-        restore_clip(context, own_clip_frame());
+        context.display_list_recorder().pop_clip_frame();
     } else if (!has_css_transform()) {
         clear_clip_overflow_rect(context, phase);
     }
@@ -479,7 +479,7 @@ void PaintableBox::paint(PaintContext& context, PaintPhase phase) const
             border_radius_data.inflate(outline_data->top.width + outline_offset_y, outline_data->right.width + outline_offset_x, outline_data->bottom.width + outline_offset_y, outline_data->left.width + outline_offset_x);
             borders_rect.inflate(outline_data->top.width + outline_offset_y, outline_data->right.width + outline_offset_x, outline_data->bottom.width + outline_offset_y, outline_data->left.width + outline_offset_x);
 
-            paint_all_borders(context.display_list_recorder(), context.rounded_device_rect(borders_rect), border_radius_data.as_corners(context), outline_data->to_device_pixels(context));
+            paint_all_borders(context.display_list_recorder(), context.rounded_device_rect(borders_rect), border_radius_data.as_corners(context.device_pixel_converter()), outline_data->to_device_pixels(context));
         }
     }
 
@@ -571,7 +571,7 @@ void PaintableBox::paint_border(PaintContext& context) const
         .bottom = box_model().border.bottom == 0 ? CSS::BorderData() : computed_values().border_bottom(),
         .left = box_model().border.left == 0 ? CSS::BorderData() : computed_values().border_left(),
     };
-    paint_all_borders(context.display_list_recorder(), context.rounded_device_rect(absolute_border_box_rect()), normalized_border_radii_data().as_corners(context), borders_data.to_device_pixels(context));
+    paint_all_borders(context.display_list_recorder(), context.rounded_device_rect(absolute_border_box_rect()), normalized_border_radii_data().as_corners(context.device_pixel_converter()), borders_data.to_device_pixels(context));
 }
 
 void PaintableBox::paint_backdrop_filter(PaintContext& context) const
@@ -647,39 +647,6 @@ Optional<CSSPixelRect> PaintableBox::clip_rect_for_hit_testing() const
     return {};
 }
 
-void PaintableBox::apply_clip(PaintContext& context, RefPtr<ClipFrame const> const& from_clip_frame)
-{
-    auto const& clip_rects = from_clip_frame->clip_rects();
-    if (clip_rects.is_empty())
-        return;
-
-    auto& display_list_recorder = context.display_list_recorder();
-    display_list_recorder.save();
-    for (auto const& clip_rect : clip_rects) {
-        Optional<i32> clip_scroll_frame_id;
-        if (clip_rect.enclosing_scroll_frame)
-            clip_scroll_frame_id = clip_rect.enclosing_scroll_frame->id();
-        display_list_recorder.push_scroll_frame_id(clip_scroll_frame_id);
-        auto rect = context.rounded_device_rect(clip_rect.rect).to_type<int>();
-        auto corner_radii = clip_rect.corner_radii.as_corners(context);
-        if (corner_radii.has_any_radius()) {
-            display_list_recorder.add_rounded_rect_clip(corner_radii, rect, CornerClip::Outside);
-        } else {
-            display_list_recorder.add_clip_rect(rect);
-        }
-        display_list_recorder.pop_scroll_frame_id();
-    }
-}
-
-void PaintableBox::restore_clip(PaintContext& context, RefPtr<ClipFrame const> const& from_clip_frame)
-{
-    auto const& clip_rects = from_clip_frame->clip_rects();
-    if (clip_rects.is_empty())
-        return;
-
-    context.display_list_recorder().restore();
-}
-
 void PaintableBox::apply_scroll_offset(PaintContext& context) const
 {
     if (scroll_frame_id().has_value()) {
@@ -702,7 +669,7 @@ void PaintableBox::apply_clip_overflow_rect(PaintContext& context, PaintPhase ph
     if (!AK::first_is_one_of(phase, PaintPhase::Background, PaintPhase::Border, PaintPhase::TableCollapsedBorder, PaintPhase::Foreground, PaintPhase::Outline))
         return;
 
-    apply_clip(context, enclosing_clip_frame());
+    context.display_list_recorder().push_clip_frame(enclosing_clip_frame());
 }
 
 void PaintableBox::clear_clip_overflow_rect(PaintContext& context, PaintPhase phase) const
@@ -713,7 +680,7 @@ void PaintableBox::clear_clip_overflow_rect(PaintContext& context, PaintPhase ph
     if (!AK::first_is_one_of(phase, PaintPhase::Background, PaintPhase::Border, PaintPhase::TableCollapsedBorder, PaintPhase::Foreground, PaintPhase::Outline))
         return;
 
-    restore_clip(context, enclosing_clip_frame());
+    context.display_list_recorder().pop_clip_frame();
 }
 
 void paint_cursor_if_needed(PaintContext& context, TextPaintable const& paintable, PaintableFragment const& fragment)

@@ -66,11 +66,19 @@ static ErrorOr<void> load_test_config(StringView test_root_path)
     }
 
     auto config = config_or_error.release_value();
+    auto add_to_skipped_tests = [&](auto const& group) -> ErrorOr<void> {
+        for (auto& key : config->keys(group))
+            s_skipped_tests.append(TRY(FileSystem::real_path(LexicalPath::join(test_root_path, key).string())));
+        return {};
+    };
 
     for (auto const& group : config->groups()) {
         if (group == "Skipped"sv) {
-            for (auto& key : config->keys(group))
-                s_skipped_tests.append(TRY(FileSystem::real_path(LexicalPath::join(test_root_path, key).string())));
+            TRY(add_to_skipped_tests(group));
+        } else if (group == "Skipped:arm64"sv) {
+#if ARCH(AARCH64)
+            TRY(add_to_skipped_tests(group));
+#endif
         } else {
             warnln("Unknown group '{}' in config {}", group, config_path);
         }
@@ -285,11 +293,30 @@ static void run_dump_test(TestWebView& view, Test& test, URL::URL const& url, in
                 on_test_complete();
         };
     } else if (test.mode == TestMode::Crash) {
-        view.on_load_finish = [on_test_complete = move(on_test_complete), url](auto const& loaded_url) {
+        view.on_load_finish = [on_test_complete, url, &view, &test](auto const& loaded_url) {
             // We don't want subframe loads to trigger the test finish.
             if (!url.equals(loaded_url, URL::ExcludeFragment::Yes))
                 return;
-            on_test_complete();
+            test.did_finish_loading = true;
+            static String wait_for_crash_test_completion = R"(
+   document.fonts.ready.then(() => {
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                internals.signalTestIsDone("PASS");
+            });
+        });
+    });
+)"_string;
+            view.run_javascript(wait_for_crash_test_completion);
+            if (test.did_finish_test)
+                on_test_complete();
+        };
+
+        view.on_test_finish = [&test, on_test_complete](auto const&) {
+            test.did_finish_test = true;
+
+            if (test.did_finish_loading)
+                on_test_complete();
         };
     }
 
@@ -534,9 +561,7 @@ static ErrorOr<int> run_tests(Core::AnonymousBuffer const& theme, Web::DevicePix
     TRY(collect_dump_tests(app, tests, ByteString::formatted("{}/Text", app.test_root_path), "."sv, TestMode::Text));
     TRY(collect_ref_tests(app, tests, ByteString::formatted("{}/Ref", app.test_root_path), "."sv));
     TRY(collect_crash_tests(app, tests, ByteString::formatted("{}/Crash", app.test_root_path), "."sv));
-#if defined(AK_OS_LINUX) && ARCH(X86_64)
     TRY(collect_ref_tests(app, tests, ByteString::formatted("{}/Screenshot", app.test_root_path), "."sv));
-#endif
 
     tests.remove_all_matching([&](auto const& test) {
         static constexpr Array support_file_patterns {

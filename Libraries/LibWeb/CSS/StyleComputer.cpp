@@ -638,6 +638,8 @@ void StyleComputer::for_each_property_expanding_shorthands(PropertyID property_i
         return;
     }
 
+    // FIXME: We should add logic in parse_css_value to parse "positional-value-list-shorthand"s as
+    //        ShorthandStyleValues to avoid the need for this (and assign_start_and_end_values).
     auto assign_edge_values = [&](PropertyID top_property, PropertyID right_property, PropertyID bottom_property, PropertyID left_property, CSSStyleValue const& value) {
         if (value.is_value_list()) {
             auto values = value.as_value_list().values();
@@ -1707,6 +1709,24 @@ void StyleComputer::compute_defaulted_values(ComputedProperties& style, DOM::Ele
     if (color.to_keyword() == Keyword::Currentcolor) {
         auto const& inherited_value = get_inherit_value(CSS::PropertyID::Color, element, pseudo_element);
         style.set_property(CSS::PropertyID::Color, inherited_value);
+    }
+
+    // AD-HOC: The -libweb-inherit-or-center style defaults to centering, unless a style value usually would have been
+    //         inherited. This is used to support the ad-hoc default <th> text-align behavior.
+    if (element && element->local_name() == HTML::TagNames::th
+        && style.property(PropertyID::TextAlign).to_keyword() == Keyword::LibwebInheritOrCenter) {
+        auto const* parent_element = element;
+        while ((parent_element = element_to_inherit_style_from(parent_element, {}))) {
+            auto parent_computed = parent_element->computed_properties();
+            auto parent_cascaded = parent_element->cascaded_properties({});
+            if (!parent_computed || !parent_cascaded)
+                break;
+            if (parent_cascaded->property(PropertyID::TextAlign)) {
+                auto const& style_value = parent_computed->property(PropertyID::TextAlign);
+                style.set_property(PropertyID::TextAlign, style_value, ComputedProperties::Inherited::Yes);
+                break;
+            }
+        }
     }
 }
 
@@ -2992,7 +3012,6 @@ void StyleComputer::build_rule_cache()
     m_pseudo_class_rule_cache[to_underlying(PseudoClass::FocusWithin)] = make<RuleCache>();
     m_pseudo_class_rule_cache[to_underlying(PseudoClass::FocusVisible)] = make<RuleCache>();
     m_pseudo_class_rule_cache[to_underlying(PseudoClass::Target)] = make<RuleCache>();
-    m_pseudo_class_rule_cache[to_underlying(PseudoClass::TargetWithin)] = make<RuleCache>();
 
     make_rule_cache_for_cascade_origin(CascadeOrigin::Author, *m_selector_insights);
     make_rule_cache_for_cascade_origin(CascadeOrigin::User, *m_selector_insights);
@@ -3087,6 +3106,15 @@ void StyleComputer::unload_fonts_from_sheet(CSSStyleSheet& sheet)
     }
 }
 
+static NonnullRefPtr<CSSStyleValue const> custom_property_initial_value(FlyString const& name)
+{
+    // FIXME: Look-up initial value for registered properties. (@property)
+    (void)name;
+
+    // For non-registered properties, the initial value is the guaranteed-invalid value.
+    return GuaranteedInvalidStyleValue::create();
+}
+
 NonnullRefPtr<CSSStyleValue const> StyleComputer::compute_value_of_custom_property(DOM::AbstractElement abstract_element, FlyString const& name, Optional<Parser::GuardedSubstitutionContexts&> guarded_contexts)
 {
     // https://drafts.csswg.org/css-variables/#propdef-
@@ -3094,19 +3122,17 @@ NonnullRefPtr<CSSStyleValue const> StyleComputer::compute_value_of_custom_proper
     // FIXME: These should probably be part of ComputedProperties.
 
     auto value = abstract_element.get_custom_property(name);
-    if (!value)
-        return GuaranteedInvalidStyleValue::create();
-
-    // Initial value is the guaranteed-invalid value.
-    if (value->is_initial())
-        return GuaranteedInvalidStyleValue::create();
+    if (!value || value->is_initial())
+        return custom_property_initial_value(name);
 
     // Unset is the same as inherit for inherited properties, and by default all custom properties are inherited.
-    // FIXME: Update handling of css-wide keywords once we support @property properly.
+    // FIXME: Support non-inherited registered custom properties.
     if (value->is_inherit() || value->is_unset()) {
+        if (!abstract_element.parent_element())
+            return custom_property_initial_value(name);
         auto inherited_value = DOM::AbstractElement { const_cast<DOM::Element&>(*abstract_element.parent_element()) }.get_custom_property(name);
         if (!inherited_value)
-            return GuaranteedInvalidStyleValue::create();
+            return custom_property_initial_value(name);
         return inherited_value.release_nonnull();
     }
 
