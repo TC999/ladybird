@@ -117,7 +117,7 @@ Parser::ParseErrorOr<NonnullRefPtr<CSSStyleValue const>> Parser::parse_descripto
                     // `component_values` already has what we want. Just skip through its tokens so code below knows we consumed them.
                     while (tokens.has_next_token())
                         tokens.discard_a_token();
-                    return UnresolvedStyleValue::create(move(component_values), false, {});
+                    return UnresolvedStyleValue::create(move(component_values));
                 }
                 case DescriptorMetadata::ValueType::PageSize: {
                     // https://drafts.csswg.org/css-page-3/#page-size-prop
@@ -188,7 +188,7 @@ Parser::ParseErrorOr<NonnullRefPtr<CSSStyleValue const>> Parser::parse_descripto
                         }
                         // All calculations in descriptors must be resolvable at parse-time.
                         if (percentage_value->is_calculated()) {
-                            auto percentage = percentage_value->as_calculated().resolve_percentage({});
+                            auto percentage = percentage_value->as_calculated().resolve_percentage_deprecated({});
                             if (percentage.has_value() && percentage->value() >= 0)
                                 return PercentageStyleValue::create(percentage.release_value());
                             return nullptr;

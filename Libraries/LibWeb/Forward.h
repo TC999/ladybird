@@ -343,6 +343,7 @@ namespace Web::CSS::Parser {
 class ComponentValue;
 class GuardedSubstitutionContexts;
 class Parser;
+class SyntaxNode;
 class Token;
 class Tokenizer;
 
@@ -350,6 +351,7 @@ struct AtRule;
 struct Declaration;
 struct Function;
 struct GuaranteedInvalidValue;
+struct ParsingParams;
 struct QualifiedRule;
 struct SimpleBlock;
 

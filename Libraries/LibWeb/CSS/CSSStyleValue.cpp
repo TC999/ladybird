@@ -11,6 +11,7 @@
 #include <LibGfx/Font/FontStyleMapping.h>
 #include <LibGfx/Font/FontWeight.h>
 #include <LibWeb/CSS/CSSStyleValue.h>
+#include <LibWeb/CSS/Parser/Parser.h>
 #include <LibWeb/CSS/StyleValues/AbstractImageStyleValue.h>
 #include <LibWeb/CSS/StyleValues/AngleStyleValue.h>
 #include <LibWeb/CSS/StyleValues/BackgroundRepeatStyleValue.h>
@@ -428,6 +429,13 @@ bool CSSStyleValue::has_auto() const
     return is_keyword() && as_keyword().keyword() == Keyword::Auto;
 }
 
+Vector<Parser::ComponentValue> CSSStyleValue::tokenize() const
+{
+    // This is an inefficient way of producing ComponentValues, but it's guaranteed to work for types that round-trip.
+    // FIXME: Implement better versions in the subclasses.
+    return Parser::Parser::create(Parser::ParsingParams {}, to_string(SerializationMode::Normal)).parse_as_list_of_component_values();
+}
+
 int CSSStyleValue::to_font_weight() const
 {
     if (is_keyword()) {
@@ -450,7 +458,7 @@ int CSSStyleValue::to_font_weight() const
         return round_to<int>(as_number().number());
     }
     if (is_calculated()) {
-        auto maybe_weight = as_calculated().resolve_integer({});
+        auto maybe_weight = as_calculated().resolve_integer_deprecated({});
         if (maybe_weight.has_value())
             return maybe_weight.value();
     }
